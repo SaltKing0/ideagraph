@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.venv/
+venv/
+env/
+*.egg-info/
+.ideagraph.db
+*.db
+*.sqlite
+*.sqlite3
+
+# Node
+node_modules/
+frontend/dist/
+frontend/.vite/
+.DS_Store
+
+# Env
+.env
+.env.local

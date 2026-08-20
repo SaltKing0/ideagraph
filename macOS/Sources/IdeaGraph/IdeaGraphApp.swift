@@ -11,7 +11,8 @@ struct IdeaGraphApp: App {
         WindowGroup {
             ContentView()
                 .preferredColorScheme(.dark)
-                .frame(minWidth: 1100, minHeight: 700)
+                .frame(minWidth: 1200, minHeight: 750)
+                .frame(idealWidth: 1320, idealHeight: 840)
                 .task {
                     sidecar.start()
                 }

@@ -48,9 +48,10 @@ struct IdeaListView: View {
                     Button("Neu laden") { Task { await fetchAll() } }.buttonStyle(.bordered).controlSize(.small)
                 }.frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                HSplitView {
-                    formPane.frame(minWidth: 340, idealWidth: 380, maxWidth: 420)
-                    listPane.frame(minWidth: 400)
+                HStack(spacing: 0) {
+                    formPane.frame(width: 380)
+                    Divider()
+                    listPane
                 }
             }
         }

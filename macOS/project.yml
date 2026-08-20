@@ -1,0 +1,49 @@
+name: IdeaGraph
+options:
+  bundleIdPrefix: com.ideagraph
+  xcodeVersion: "15.0"
+  deploymentTarget:
+    macOS: "14.0"
+  generateEmptyDirectories: true
+
+targets:
+  IdeaGraph:
+    type: application
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - Sources
+    resources:
+      - Resources
+    settings:
+      base:
+        SWIFT_VERSION: 5.0
+        SWIFT_EMIT_LOC_STRINGS: false
+        MACOSX_DEPLOYMENT_TARGET: 14.0
+        INFOPLIST_FILE: Sources/IdeaGraph/Info.plist
+        PRODUCT_NAME: IdeaGraph
+        PRODUCT_BUNDLE_IDENTIFIER: com.ideagraph.app
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGNING_ALLOWED: NO
+        CODE_SIGNING_REQUIRED: NO
+        ENABLE_HARDENED_RUNTIME: NO
+        COMBINE_HIDPI_IMAGES: YES
+    postBuildScripts:
+      - name: Embed Sidecar
+        script: |
+          set -e
+          echo "Embedding sidecar..."
+          # Prefer sidecar/ (canonical, portabel), fallback to macOS/Resources for local dev
+          SRC1="$SRCROOT/../sidecar"
+          SRC2="$SRCROOT/Resources"
+          DST="$BUILT_PRODUCTS_DIR/$PRODUCT_NAME.app/Contents/Resources"
+          mkdir -p "$DST"
+          for SRC in "$SRC1" "$SRC2"; do
+            if [ -f "$SRC/ideagraph-backend" ]; then cp -f "$SRC/ideagraph-backend" "$DST/ideagraph-backend"; chmod +x "$DST/ideagraph-backend"; echo "copied ideagraph-backend from $SRC"; break; fi
+          done
+          for SRC in "$SRC1" "$SRC2"; do
+            if [ -f "$SRC/ideagraph-backend-aarch64-apple-darwin" ]; then cp -f "$SRC/ideagraph-backend-aarch64-apple-darwin" "$DST/ideagraph-backend-aarch64-apple-darwin"; chmod +x "$DST/ideagraph-backend-aarch64-apple-darwin"; echo "copied aarch64 from $SRC"; break; fi
+          done
+          ls -lh "$DST" | head -n 20

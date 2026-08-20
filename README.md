@@ -89,8 +89,9 @@ IdeaGraph/
 │   │       ├── graph.py
 │   │       └── stats.py
 │   ├── main.py               # Shim für `uvicorn main:app --reload`
+│   ├── run_server.py         # NEU: Sidecar-Entrypoint (uvicorn 127.0.0.1:$PORT)
 │   └── requirements.txt
-├── frontend/
+├── frontend/                 # bleibt für späteren Tauri/Win-Build erhalten
 │   ├── src/
 │   │   ├── api.ts            # fetch-Wrapper
 │   │   ├── types.ts          # TS-Typen + CONNECTION_TYPES
@@ -101,11 +102,33 @@ IdeaGraph/
 │   │       ├── Dashboard.tsx
 │   │       ├── IdeaList.tsx + IdeaForm.tsx
 │   │       ├── ConnectionForm.tsx
-│   │       ├── GraphView.tsx   # D3 Force
+│   │       ├── GraphView.swift   # D3 Force (Web) → SwiftUI Canvas (Mac)
 │   │       └── Timeline.tsx
 │   ├── vite.config.ts        # Proxy /ideas → :8000
 │   ├── tailwind.config.js
 │   └── package.json
+├── macOS/                    # NEU: native SwiftUI-App
+│   ├── IdeaGraph.xcodeproj   # via XcodeGen (project.yml)
+│   ├── Sources/IdeaGraph/
+│   │   ├── IdeaGraphApp.swift      # @main, startet Sidecar
+│   │   ├── SidecarManager.swift    # Process, PORT, DATABASE_URL, AppSupport
+│   │   ├── APIClient.swift         # URLSession, http://127.0.0.1:$PORT
+│   │   ├── Models.swift            # Codable (Idea, Connection, Graph, Stats)
+│   │   ├── Views/
+│   │   │   ├── Sidebar.swift
+│   │   │   ├── DashboardView.swift
+│   │   │   ├── IdeaListView.swift + IdeaFormView.swift
+│   │   │   ├── ConnectionFormView.swift
+│   │   │   ├── GraphView.swift     # Canvas + Force-Simulation
+│   │   │   └── TimelineView.swift
+│   │   └── Assets.xcassets/AppIcon.appiconset
+│   ├── Resources/
+│   │   └── ideagraph-backend*      # kopiert aus sidecar/ via postBuildScript
+│   └── project.yml           # XcodeGen-Spec
+├── sidecar/                  # NEU: kompiliertes Backend-Binary (portabel)
+│   ├── ideagraph-backend               # current (arm64 macOS)
+│   └── ideagraph-backend-aarch64-apple-darwin  # explizit für Mac
+├── IdeaGraph.app             # NEU: gebaute .app (Doppelklick, nach Build)
 ├── requirements.txt          # Kopie für `pip install -r requirements.txt` im Root
 ├── PROJEKT.md
 └── README.md
@@ -160,6 +183,75 @@ cd frontend
 npm run build   # → frontend/dist
 npm run preview # optional
 ```
+
+---
+
+## 🍎 Native macOS App (SwiftUI + Sidecar) — Doppelklick ohne Terminal
+
+> Entscheidung: **SwiftUI nativ** (kein WebView). Backend als **einzelnes Binary** via PyInstaller (Python 3.12) als Sidecar in die `.app` eingebettet. Portabel: später Windows/Linux via Tauri/React ohne Backend-Rewrite.
+
+### Architektur
+- `macOS/Sources/IdeaGraph/IdeaGraphApp.swift` — `@main`, startet `SidecarManager` beim `task`, stoppt beim `terminate`.
+- `SidecarManager.swift` — findet `ideagraph-backend` im Bundle (`Bundle.main.url(forResource:)`), wählt freien Port ab 8000, setzt `DATABASE_URL=sqlite:////Users/.../Library/Caches/IdeaGraph/ideagraph.db` (Caches statt `Application Support` wegen PyInstaller-Leerzeichen-Bug, siehe unten), startet `Process`, loggt stdout/stderr, health-check `http://127.0.0.1:$PORT/health`, beendet beim App-Exit.
+- `APIClient.swift` — `base = http://127.0.0.1:\(port)`, async/await für alle Endpunkte (`listIdeas`, `createIdea`, … `getGraph`, `getStats`).
+- SwiftUI Views 1:1 zu React: `Sidebar` (NavigationSplitView), `DashboardView`, `IdeaListView` + `IdeaFormView`, `ConnectionFormView`, `GraphView` (Canvas + Force-Simulation mit Timer, Drag & Drop, Zoom/Pan, Tag-Punkt, Typ-Farben), `TimelineView`. Dunkles Theme `#09090b`/`#18181b`/`#27272a`, Indigo `#6366f1`.
+
+### Datenpersistenz
+- Beim Start wird `~/Library/Caches/IdeaGraph/` (und `~/Library/Application Support/IdeaGraph/` für Kompatibilität) angelegt.
+- Sidecar bekommt `DATABASE_URL` als env; DB liegt in `Caches/IdeaGraph/ideagraph.db` (statt `Application Support` mit Leerzeichen, da PyInstaller-`onefile` mit Leerzeichen im SQLite-Pfad hängt — Python direkt funktioniert, Binary nicht; daher Caches ohne Leerzeichen; DB persistiert zwischen Neustarts).
+- `frontend/` bleibt erhalten für späteren Tauri-Build.
+
+### Voraussetzungen (macOS)
+- Xcode 15+ (getestet 26.6, Swift 6.3, macOS 14 SDK), `xcodegen` (`brew install xcodegen`)
+- Python 3.12 (`brew install python@3.12`), `pyinstaller` (`python3.12 -m pip install pyinstaller`)
+
+### Backend als Sidecar bauen
+```bash
+# 1. Sidecar-Entrypoint bereits vorhanden: backend/run_server.py
+cat backend/run_server.py  # uvicorn.run(app, host="127.0.0.1", port=int(os.getenv("PORT",8000)))
+
+# 2. Binary bauen (Python 3.12, NICHT 3.14)
+python3.12 -m pip install --break-system-packages -r backend/requirements.txt pyinstaller
+python3.12 -m PyInstaller --name ideagraph-backend --onefile backend/run_server.py \
+  --distpath sidecar --workpath /tmp/pyinstaller_build --specpath /tmp --clean --noconfirm \
+  --hidden-import=uvicorn.logging --hidden-import=uvicorn.lifespan --collect-submodules app
+cp sidecar/ideagraph-backend sidecar/ideagraph-backend-aarch64-apple-darwin
+cp sidecar/ideagraph-backend macOS/Resources/
+```
+
+### macOS App bauen
+```bash
+# XcodeGen → .xcodeproj erzeugen
+xcodegen generate --spec macOS/project.yml --project macOS
+
+# Build (Debug, ad-hoc signiert, kein Hardened Runtime)
+xcodebuild -project macOS/IdeaGraph.xcodeproj -scheme IdeaGraph -configuration Debug build
+
+# .app liegt dann in DerivedData, z. B.:
+find ~/Library/Developer/Xcode/DerivedData -name "IdeaGraph.app" -type d | head
+# Für Doppelklick bequem kopieren:
+cp -R ~/Library/Developer/Xcode/DerivedData/IdeaGraph-*/Build/Products/Debug/IdeaGraph.app ./IdeaGraph.app
+# oder aus macOS/ heraus:
+xcodebuild -project macOS/IdeaGraph.xcodeproj -scheme IdeaGraph -configuration Release build  # optional
+```
+
+### Starten & Testen
+```bash
+# Doppelklick im Finder:
+open IdeaGraph.app
+# oder im Terminal zum Log-Sehen:
+./IdeaGraph.app/Contents/MacOS/IdeaGraph
+# Sidecar läuft auf http://127.0.0.1:8000 (falls belegt, nimmt SidecarManager 8001+)
+curl http://127.0.0.1:8000/health  # → {"status":"ok"}
+# In der App: Idee anlegen → Dashboard zählt, 2. Idee + Verbindung → Graph zeigt Edge, Timeline „Letzte Woche“, Graph Drag/Zoom/Click→Sheet, DB wächst in ~/Library/Caches/IdeaGraph/ideagraph.db
+```
+- **Ohne Signing:** Beim ersten Start Rechtsklick → Öffnen → Öffnen (Gatekeeper).
+- **Beenden:** Fenster schließen → Sidecar wird via `process.terminate()` sauber beendet.
+
+### Warum so?
+- Swift lernen, nur macOS privat nutzen → SwiftUI nativ sinnvoll.
+- Backend als Binary portabel → später Tauri (React) für Win/Linux kann dasselbe `sidecar/ideagraph-backend-*` nutzen, kein Rewrite.
+- `frontend/` bleibt als Web-Fallback.
 
 ---
 

@@ -18,6 +18,21 @@ frontend/dist/
 frontend/.vite/
 .DS_Store
 
+# macOS App build
+IdeaGraph.app/
+macOS/build/
+DerivedData/
+*.xcuserdata
+*.xccheckout
+*.moved-aside
+*.hmap
+*.ipa
+
+# Sidecar build artifacts
+sidecar/__pycache__/
+sidecar/*.spec
+/tmp/pyinstaller_build/
+
 # Env
 .env
 .env.local

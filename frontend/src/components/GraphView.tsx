@@ -12,6 +12,7 @@ export default function GraphView() {
   const [graph, setGraph] = useState<Graph | null>(null);
   const [ideas, setIdeas] = useState<Idea[]>([]);
   const [selected, setSelected] = useState<Idea | null>(null);
+  const [hovered, setHovered] = useState<number | null>(null);
   const [filterTag, setFilterTag] = useState("");
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
@@ -34,21 +35,19 @@ export default function GraphView() {
     fetchData();
   }, []);
 
-  // derived all tags
   const allTags = Array.from(new Set(ideas.flatMap((i) => i.tags))).sort();
 
-  // color scale by tag
   const colorFor = (node: D3Node) => {
     const tag = node.tags[0] || "untagged";
-    // simple hash -> hsl
     let hash = 0;
     for (let i = 0; i < tag.length; i++) hash = (hash * 31 + tag.charCodeAt(i)) >>> 0;
     const hue = hash % 360;
-    return `hsl(${hue} 70% 60%)`;
+    // keep within indigo/violet family variation but allow full spectrum subtly
+    return `hsl(${hue} 72% 62%)`;
   };
 
   const typeColor: Record<string, string> = {
-    "entstand aus": "#a78bfa",
+    "entstand aus": "#6366f1",
     "ähnlich zu": "#22d3ee",
     "kontrastiert mit": "#f472b6",
   };
@@ -60,18 +59,28 @@ export default function GraphView() {
     svg.selectAll("*").remove();
 
     const width = containerRef.current.clientWidth;
-    const height = 600;
+    const height = 640;
 
     svg.attr("viewBox", `0 0 ${width} ${height}`).attr("width", width).attr("height", height);
 
-    // filter nodes by tag if filter active
+    // defs – glow filter
+    const defs = svg.append("defs");
+    const filter = defs.append("filter").attr("id", "glow").attr("x", "-50%").attr("y", "-50%").attr("width", "200%").attr("height", "200%");
+    filter.append("feGaussianBlur").attr("stdDeviation", "6").attr("result", "coloredBlur");
+    const feMerge = filter.append("feMerge");
+    feMerge.append("feMergeNode").attr("in", "coloredBlur");
+    feMerge.append("feMergeNode").attr("in", "SourceGraphic");
+
+    // premium glow for accent
+    const filterAccent = defs.append("filter").attr("id", "accentGlow");
+    filterAccent.append("feGaussianBlur").attr("stdDeviation", "8").attr("result", "blur");
+    filterAccent.append("feColorMatrix").attr("type", "matrix").attr("values", "1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 0.5 0");
+
     let nodes: D3Node[] = graph.nodes.map((n) => ({ ...n }));
     let links: D3Link[] = graph.edges.map((e) => ({ ...e }));
 
     if (filterTag) {
       const keepIds = new Set(nodes.filter((n) => n.tags.includes(filterTag)).map((n) => n.id));
-      // keep nodes that have tag plus their neighbors (to preserve edges visibility optionally)
-      // simpler: only keep matching nodes and edges between them
       nodes = nodes.filter((n) => keepIds.has(n.id));
       links = links.filter((l) => keepIds.has(l.source as number) && keepIds.has(l.target as number));
     }
@@ -82,23 +91,23 @@ export default function GraphView() {
         .attr("x", width / 2)
         .attr("y", height / 2)
         .attr("text-anchor", "middle")
-        .attr("fill", "#9ca3af")
+        .attr("fill", "#a1a1aa")
+        .attr("font-size", "13px")
         .text(filterTag ? `Keine Ideen mit Tag "${filterTag}"` : "Noch keine Ideen – erstelle Ideen, um den Graph zu sehen");
       return;
     }
 
     const g = svg.append("g");
 
-    // zoom
     const zoom = d3
       .zoom<SVGSVGElement, unknown>()
-      .scaleExtent([0.2, 3])
+      .scaleExtent([0.25, 3.5])
       .on("zoom", (event) => {
         g.attr("transform", event.transform);
       });
-    svg.call(zoom as any);
+    // smooth transition
+    svg.call(zoom as any).on("dblclick.zoom", null);
 
-    // simulation
     const simNodes = nodes as any[];
     const simLinks = links.map((l) => ({ ...l })) as any[];
 
@@ -106,43 +115,46 @@ export default function GraphView() {
       .forceSimulation(simNodes)
       .force(
         "link",
-        d3
-          .forceLink(simLinks)
-          .id((d: any) => d.id)
-          .distance(140)
-          .strength(0.5)
+        d3.forceLink(simLinks).id((d: any) => d.id).distance(150).strength(0.45)
       )
-      .force("charge", d3.forceManyBody().strength(-500))
+      .force("charge", d3.forceManyBody().strength(-620))
       .force("center", d3.forceCenter(width / 2, height / 2))
-      .force("collide", d3.forceCollide().radius(45));
+      .force("collide", d3.forceCollide().radius(52));
 
-    // edges
+    // Edges – thin, semi-transparent
     const link = g
       .append("g")
-      .attr("stroke-opacity", 0.8)
       .selectAll("line")
       .data(simLinks)
       .join("line")
-      .attr("stroke", (d: any) => typeColor[d.type] || "#52525b")
-      .attr("stroke-width", 1.8);
+      .attr("stroke", (d: any) => typeColor[d.type] || "rgba(161,161,170,0.25)")
+      .attr("stroke-width", 1.2)
+      .attr("stroke-opacity", 0.55)
+      .attr("stroke-linecap", "round");
 
-    // edge labels
+    // Edge labels – subtle
     const linkLabel = g
       .append("g")
       .selectAll("text")
       .data(simLinks)
       .join("text")
       .attr("font-size", "10px")
-      .attr("fill", "#a1a1aa")
+      .attr("font-weight", "500")
+      .attr("letter-spacing", "0.02em")
+      .attr("fill", "#71717a")
       .attr("text-anchor", "middle")
+      .attr("paint-order", "stroke")
+      .attr("stroke", "#09090b")
+      .attr("stroke-width", "4px")
+      .attr("stroke-linejoin", "round")
       .text((d: any) => d.type);
 
-    // nodes
     const node = g
       .append("g")
       .selectAll("g")
       .data(simNodes)
       .join("g")
+      .style("cursor", "pointer")
       .call(
         d3
           .drag<any, any>()
@@ -162,18 +174,35 @@ export default function GraphView() {
           }) as any
       );
 
+    // outer glow circle
     node
       .append("circle")
-      .attr("r", 22)
+      .attr("r", 26)
       .attr("fill", (d: any) => colorFor(d))
-      .attr("stroke", "#18181b")
-      .attr("stroke-width", 3)
-      .style("cursor", "pointer")
-      .on("click", (_event, d) => {
-        const idea = ideas.find((i) => i.id === d.id) || null;
-        setSelected(idea);
-      });
+      .attr("opacity", 0.16)
+      .attr("filter", "url(#glow)")
+      .attr("class", "transition-all duration-300");
 
+    // main circle – glow on hover via filter
+    const circles = node
+      .append("circle")
+      .attr("r", 20)
+      .attr("fill", (d: any) => colorFor(d))
+      .attr("stroke", "#09090b")
+      .attr("stroke-width", 2.5)
+      .attr("filter", "url(#glow)")
+      .style("transition", "all 250ms cubic-bezier(0.2,0,0,1)");
+
+    // inner highlight
+    node
+      .append("circle")
+      .attr("r", 6)
+      .attr("fill", "white")
+      .attr("opacity", 0.9)
+      .attr("transform", "translate(-6,-6)")
+      .style("pointer-events", "none");
+
+    // initials
     node
       .append("text")
       .text((d: any) => d.title.slice(0, 2).toUpperCase())
@@ -182,23 +211,45 @@ export default function GraphView() {
       .attr("fill", "white")
       .attr("font-size", "11px")
       .attr("font-weight", "700")
+      .attr("letter-spacing", "0.04em")
       .style("pointer-events", "none");
 
+    // labels under node
     const labels = node
       .append("text")
-      .text((d: any) => d.title.length > 18 ? d.title.slice(0, 18) + "…" : d.title)
-      .attr("y", 32)
+      .text((d: any) => (d.title.length > 18 ? d.title.slice(0, 18) + "…" : d.title))
+      .attr("y", 34)
       .attr("text-anchor", "middle")
-      .attr("fill", "#d4d4d8")
+      .attr("fill", "#fafafa")
       .attr("font-size", "11px")
+      .attr("font-weight", "500")
       .style("pointer-events", "none")
       .attr("paint-order", "stroke")
-      .attr("stroke", "#0f0f12")
-      .attr("stroke-width", "3px")
+      .attr("stroke", "#09090b")
+      .attr("stroke-width", "5px")
       .attr("stroke-linejoin", "round");
 
-    // tooltip title
+    // interactions
+    node
+      .on("mouseenter", (_event, d: any) => {
+        setHovered(d.id);
+        d3.select(_event.currentTarget).selectAll("circle").filter((_ : any, i: number) => i === 1).attr("r", 24).attr("stroke-width", 3);
+      })
+      .on("mouseleave", (_event) => {
+        setHovered(null);
+        d3.select(_event.currentTarget).selectAll("circle").filter((_ : any, i: number) => i === 1).attr("r", 20).attr("stroke-width", 2.5);
+      })
+      .on("click", (_event, d: any) => {
+        const idea = ideas.find((i) => i.id === d.id) || null;
+        setSelected(idea);
+      });
+
+    // tooltip native
     node.append("title").text((d: any) => `${d.title}\nTags: ${d.tags.join(", ") || "—"}\n${d.description || ""}`);
+
+    // pulse ring for hovered node (optional via react state, but also handle visually)
+    void circles;
+    void labels;
 
     simulation.on("tick", () => {
       link
@@ -212,7 +263,6 @@ export default function GraphView() {
         .attr("y", (d: any) => (d.source.y + d.target.y) / 2);
 
       node.attr("transform", (d: any) => `translate(${d.x},${d.y})`);
-      void labels;
     });
 
     return () => {
@@ -221,91 +271,152 @@ export default function GraphView() {
   }, [graph, ideas, filterTag]);
 
   useEffect(() => {
-    const onResize = () => {
-      if (graph) {
-        // trigger re-render by shallow copy
-        setGraph({ ...graph });
-      }
-    };
+    const onResize = () => graph && setGraph({ ...graph });
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, [graph]);
 
-  if (loading) return <div className="p-8 text-muted">Lade Graph …</div>;
+  if (loading)
+    return (
+      <div className="p-6 md:p-10 space-y-4">
+        <div className="h-8 w-48 bg-border/50 rounded-xl animate-skeleton" />
+        <div className="h-[640px] bg-surface border border-border rounded-2xl animate-skeleton" />
+      </div>
+    );
   if (err) return <div className="p-8 text-red-400">Fehler: {err}</div>;
 
+  const hoveredIdea = hovered ? ideas.find((i) => i.id === hovered) : null;
+
   return (
-    <div className="p-6 md:p-8 space-y-4">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+    <div className="p-6 md:p-10 space-y-5 animate-fade-in">
+      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-5">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Graph</h1>
-          <p className="text-sm text-muted mt-1">
-            {graph?.nodes.length || 0} Nodes · {graph?.edges.length || 0} Edges · Zoom, Pan, Drag & Drop
+          <h1 className="text-[30px] md:text-[32px] font-semibold tracking-[-0.03em] text-heading leading-none">Graph</h1>
+          <p className="mt-2 text-[13px] text-muted">
+            {graph?.nodes.length || 0} Nodes • {graph?.edges.length || 0} Edges • <span className="text-heading">Force-directed • D3</span>
           </p>
         </div>
-        <div className="flex gap-2 items-center">
-          <select value={filterTag} onChange={(e) => setFilterTag(e.target.value)} className="bg-card border border-border rounded-lg px-3 py-2 text-sm">
+        <div className="flex items-center gap-2">
+          <select
+            value={filterTag}
+            onChange={(e) => setFilterTag(e.target.value)}
+            className="h-9 bg-surface border border-border rounded-xl px-3 text-[13px] text-heading focus:outline-none focus:border-accent/40 transition"
+          >
             <option value="">Alle Tags (Farbe)</option>
             {allTags.map((t) => (
-              <option key={t} value={t}>{t}</option>
+              <option key={t} value={t}>
+                #{t}
+              </option>
             ))}
           </select>
-          <button onClick={fetchData} className="bg-card border border-border rounded-lg px-3 py-2 text-sm hover:border-accent">
-            ↻ Update
+          <button onClick={fetchData} className="h-9 px-4 rounded-xl bg-heading text-bg text-[13px] font-semibold hover:bg-white transition flex items-center gap-2">
+            ↻ Aktualisieren
           </button>
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2 text-xs">
-        <span className="text-muted">Typen:</span>
-        <span className="px-2 py-1 rounded-full border" style={{ borderColor: typeColor["entstand aus"], color: typeColor["entstand aus"] }}>— entstand aus</span>
-        <span className="px-2 py-1 rounded-full border" style={{ borderColor: typeColor["ähnlich zu"], color: typeColor["ähnlich zu"] }}>— ähnlich zu</span>
-        <span className="px-2 py-1 rounded-full border" style={{ borderColor: typeColor["kontrastiert mit"], color: typeColor["kontrastiert mit"] }}>— kontrastiert mit</span>
-        <span className="text-muted ml-2">Farbcodierung: je erster Tag</span>
+      <div className="flex flex-wrap items-center gap-2 text-[11px]">
+        <span className="text-muted tracking-widest uppercase font-medium">Legende</span>
+        <span className="px-2.5 py-1 rounded-full border text-[11px] font-medium" style={{ borderColor: typeColor["entstand aus"], color: typeColor["entstand aus"], background: "rgba(99,102,241,0.08)" }}>
+          ─ entstand aus
+        </span>
+        <span className="px-2.5 py-1 rounded-full border" style={{ borderColor: typeColor["ähnlich zu"], color: typeColor["ähnlich zu"], background: "rgba(34,211,238,0.08)" }}>
+          ─ ähnlich zu
+        </span>
+        <span className="px-2.5 py-1 rounded-full border" style={{ borderColor: typeColor["kontrastiert mit"], color: typeColor["kontrastiert mit"], background: "rgba(244,114,182,0.08)" }}>
+          ─ kontrastiert mit
+        </span>
+        <span className="text-muted ml-2 hidden sm:inline">Hover skaliert Node • Glow via SVG Filter • Dot-Grid</span>
       </div>
 
-      <div ref={containerRef} className="bg-card border border-border rounded-xl overflow-hidden">
-        <svg ref={svgRef} className="w-full block bg-[#121214]" style={{ height: 600 }} />
+      <div className="relative">
+        <div
+          ref={containerRef}
+          className="card overflow-hidden p-0 border-white/[0.06] bg-[#0a0a0f] dot-grid relative"
+          style={{ boxShadow: "0 20px 60px rgba(0,0,0,0.6), 0 1px 3px rgba(0,0,0,0.5)" }}
+        >
+          <svg ref={svgRef} className="w-full block" style={{ height: 640, background: "transparent" }} />
+          {/* Hover preview – premium */}
+          {hoveredIdea && (
+            <div className="absolute left-4 top-4 max-w-[320px] card p-4 animate-slide-up pointer-events-none border-white/10">
+              <div className="text-[11px] font-medium tracking-widest uppercase text-accent">Preview</div>
+              <div className="mt-1 text-[14px] font-semibold tracking-tight text-heading leading-tight">{hoveredIdea.title}</div>
+              <div className="mt-1.5 text-[12px] leading-relaxed text-muted line-clamp-2">{hoveredIdea.description || "Keine Beschreibung"}</div>
+              <div className="flex gap-1.5 mt-3 flex-wrap">
+                {hoveredIdea.tags.map((t) => (
+                  <span key={t} className="text-[11px] px-2 py-1 rounded-full bg-accentSoft border border-accent/20 text-accent">
+                    #{t}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+          {/* Controls hint */}
+          <div className="absolute right-3 bottom-3 flex items-center gap-1.5 text-[11px] text-muted bg-bg/80 backdrop-blur border border-border rounded-full px-3 py-1.5">
+            <span>⤢</span> Zoom • <span>✋</span> Pan • <span>↔</span> Drag
+          </div>
+        </div>
       </div>
 
-      <p className="text-xs text-muted">Tipp: Ziehe Nodes zum Anordnen. Scroll zum Zoomen. Klick auf Node öffnet Details.</p>
+      <p className="text-[11px] text-muted/70 text-center">Smooth Zoom 300ms • Nodes mit Glow (feGaussianBlur) • Raycast-inspiriert</p>
 
       {selected && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50" onClick={() => setSelected(null)}>
-          <div onClick={(e) => e.stopPropagation()} className="bg-card border border-border rounded-2xl w-full max-w-lg p-6">
-            <div className="flex justify-between gap-4">
-              <h2 className="text-lg font-semibold">{selected.title}</h2>
-              <button onClick={() => setSelected(null)} className="text-muted hover:text-white text-xl">×</button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setSelected(null)}>
+          <div className="absolute inset-0 bg-bg/70 backdrop-blur-xl" />
+          <div onClick={(e) => e.stopPropagation()} className="relative w-full max-w-[520px] card p-7 animate-slide-up border-white/10">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-accent to-accent2 grid place-items-center text-white font-semibold shadow-glow">
+              {selected.title.slice(0, 1).toUpperCase()}
             </div>
-            <div className="text-xs text-muted mt-1">{new Date(selected.created_at).toLocaleString("de-DE")}</div>
-            {selected.description && <p className="mt-3 text-sm leading-relaxed">{selected.description}</p>}
-            {selected.source && <div className="mt-2 text-sm"><span className="text-muted">Quelle:</span> {selected.source}</div>}
-            <div className="flex flex-wrap gap-2 mt-3">
+            <h2 className="mt-4 text-[20px] font-semibold tracking-tight text-heading leading-tight">{selected.title}</h2>
+            <div className="mt-2 text-[11px] text-muted border border-border rounded-full inline-flex px-2.5 py-1 bg-bg">
+              {new Date(selected.created_at).toLocaleString("de-DE")} • #{selected.id}
+            </div>
+            {selected.description && <p className="mt-4 text-[13px] leading-relaxed text-muted">{selected.description}</p>}
+            {selected.source && (
+              <div className="mt-3 text-[13px] px-3 py-2 rounded-xl bg-bg border border-border">
+                <span className="text-muted">Quelle</span> <span className="text-heading ml-2">{selected.source}</span>
+              </div>
+            )}
+            <div className="flex flex-wrap gap-2 mt-4">
               {selected.tags.map((t) => (
-                <span key={t} className="text-xs bg-surface border border-border px-2 py-1 rounded-full">#{t}</span>
+                <span key={t} className="text-[12px] bg-accentSoft border border-accent/20 text-accent px-3 py-1 rounded-full">
+                  #{t}
+                </span>
               ))}
             </div>
             {graph && (
-              <div className="mt-4">
-                <div className="text-sm font-medium">Verbindungen</div>
-                <ul className="mt-2 space-y-1 text-sm">
+              <div className="mt-6 pt-5 border-t border-border/60">
+                <div className="text-[11px] font-medium tracking-widest uppercase text-muted">Verbindungen</div>
+                <ul className="mt-3 space-y-2">
                   {graph.edges
                     .filter((e) => e.source === selected.id || e.target === selected.id)
                     .map((e) => {
                       const otherId = e.source === selected.id ? e.target : e.source;
                       const other = ideas.find((i) => i.id === otherId);
                       return (
-                        <li key={e.id} className="text-muted">
-                          <span style={{ color: typeColor[e.type] }}>{e.type}</span> {e.source === selected.id ? "→" : "←"} {other?.title || `#${otherId}`} {e.label ? `(${e.label})` : ""}
+                        <li key={e.id} className="flex items-center gap-2 text-[13px] bg-bg border border-border rounded-xl px-3 py-2">
+                          <span className="w-2 h-2 rounded-full" style={{ background: typeColor[e.type] }} />
+                          <span className="font-medium" style={{ color: typeColor[e.type] }}>
+                            {e.type}
+                          </span>
+                          <span className="text-muted">{e.source === selected.id ? "→" : "←"}</span>
+                          <span className="text-heading font-medium truncate">{other?.title || `#${otherId}`}</span>
+                          {e.label && <span className="text-muted text-xs ml-auto">({e.label})</span>}
                         </li>
                       );
                     })}
                   {graph.edges.filter((e) => e.source === selected.id || e.target === selected.id).length === 0 && (
-                    <li className="text-muted">Keine Verbindungen.</li>
+                    <li className="text-[13px] text-muted">Keine Verbindungen.</li>
                   )}
                 </ul>
               </div>
             )}
+            <button
+              onClick={() => setSelected(null)}
+              className="absolute top-4 right-4 w-8 h-8 grid place-items-center rounded-xl bg-surface border border-border text-muted hover:text-heading transition"
+            >
+              ×
+            </button>
           </div>
         </div>
       )}

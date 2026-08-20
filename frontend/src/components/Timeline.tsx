@@ -25,7 +25,6 @@ export default function Timeline() {
     return ideas.filter((i) => new Date(i.created_at) >= cutoff);
   }, [ideas, filter, now]);
 
-  // group by date string
   const groups = useMemo(() => {
     const map = new Map<string, Idea[]>();
     filtered
@@ -39,29 +38,35 @@ export default function Timeline() {
     return Array.from(map.entries());
   }, [filtered]);
 
-  if (loading) return <div className="p-8 text-muted">Lade Timeline …</div>;
+  if (loading)
+    return (
+      <div className="p-6 md:p-10 space-y-4">
+        <div className="h-8 w-48 bg-border/60 rounded-xl animate-skeleton" />
+        <div className="h-64 bg-surface border border-border rounded-2xl animate-skeleton" />
+      </div>
+    );
   if (err) return <div className="p-8 text-red-400">Fehler: {err}</div>;
 
   return (
-    <div className="p-6 md:p-8">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-6">
+    <div className="p-6 md:p-10 animate-fade-in">
+      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-8">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Zeitleiste</h1>
-          <p className="text-sm text-muted mt-1">
-            {filtered.length} Ideen {filter === "week" ? "· letzte 7 Tage" : filter === "month" ? "· letzte 30 Tage" : "· gesamt"} – sortiert nach Datum
+          <h1 className="text-[30px] md:text-[32px] font-semibold tracking-[-0.03em] text-heading leading-none">Zeitleiste</h1>
+          <p className="mt-2 text-[13px] text-muted">
+            {filtered.length} Ideen {filter === "week" ? "• letzte 7 Tage" : filter === "month" ? "• letzte 30 Tage" : "• gesamt"} — chronologisch
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex p-1 rounded-xl bg-surface border border-border">
           {[
             { id: "all", label: "Alle" },
-            { id: "week", label: "Letzte Woche" },
-            { id: "month", label: "Letzter Monat" },
+            { id: "week", label: "Woche" },
+            { id: "month", label: "Monat" },
           ].map((btn) => (
             <button
               key={btn.id}
               onClick={() => setFilter(btn.id as any)}
-              className={`px-4 py-2 rounded-lg text-sm border ${
-                filter === btn.id ? "bg-accent text-white border-accent" : "bg-card border-border text-muted hover:text-white"
+              className={`px-4 py-1.5 rounded-lg text-[13px] font-medium transition duration-200 ${
+                filter === btn.id ? "bg-heading text-bg shadow" : "text-muted hover:text-heading"
               }`}
             >
               {btn.label}
@@ -71,40 +76,39 @@ export default function Timeline() {
       </div>
 
       {groups.length === 0 ? (
-        <div className="bg-card border border-dashed border-border rounded-xl p-8 text-center text-muted">
-          Keine Ideen in diesem Zeitraum.
+        <div className="card p-12 text-center border-dashed">
+          <div className="text-[13px] text-muted">Keine Ideen in diesem Zeitraum.</div>
         </div>
       ) : (
         <div className="relative">
-          {/* vertical line */}
-          <div className="absolute left-4 top-0 bottom-0 w-px bg-border hidden md:block" />
-          <div className="space-y-8">
+          <div className="absolute left-[15px] top-0 bottom-0 w-px bg-gradient-to-b from-border via-border to-transparent hidden md:block" />
+          <div className="space-y-10">
             {groups.map(([dateStr, items]) => (
               <div key={dateStr} className="relative">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="hidden md:flex w-8 h-8 rounded-full bg-accent/20 border border-accent/30 items-center justify-center text-accent text-sm shrink-0">
-                    ●
-                  </div>
-                  <div className="bg-card border border-border rounded-full px-3 py-1 text-sm font-medium">{dateStr}</div>
-                  <div className="text-xs text-muted">{items.length} Ideen</div>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="hidden md:grid w-8 h-8 rounded-full bg-accent text-white place-items-center text-xs shadow-glow shrink-0">●</div>
+                  <div className="px-3.5 py-1.5 rounded-full bg-surface border border-border text-[13px] font-medium text-heading">{dateStr}</div>
+                  <span className="text-[11px] px-2 py-1 rounded-full bg-bg border border-border text-muted">{items.length} Ideen</span>
                 </div>
-                <div className="md:ml-11 grid gap-3">
+                <div className="md:ml-10 grid gap-3">
                   {items.map((idea) => (
-                    <div key={idea.id} className="bg-card border border-border rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="font-medium">{idea.title}</div>
-                        {idea.description && <div className="text-sm text-muted line-clamp-2 mt-1">{idea.description}</div>}
-                        <div className="flex flex-wrap gap-1.5 mt-2">
+                    <div key={idea.id} className="group card card-hover p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div className="min-w-0 flex-1">
+                        <div className="text-[14px] font-semibold tracking-tight text-heading group-hover:text-accent transition">{idea.title}</div>
+                        {idea.description && <div className="text-[13px] leading-relaxed text-muted line-clamp-2 mt-1.5">{idea.description}</div>}
+                        <div className="flex flex-wrap gap-1.5 mt-3">
                           {idea.tags.map((t) => (
-                            <span key={t} className="text-xs bg-surface border border-border px-2 py-0.5 rounded-full">
+                            <span key={t} className="text-[11px] font-medium bg-bg border border-border px-2.5 py-1 rounded-full text-muted">
                               #{t}
                             </span>
                           ))}
                         </div>
                       </div>
-                      <div className="text-xs text-muted shrink-0 text-right">
-                        <div>{new Date(idea.created_at).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}</div>
-                        {idea.source && <div className="mt-1">↗ {idea.source}</div>}
+                      <div className="shrink-0 text-right flex flex-col items-end gap-1">
+                        <span className="text-[11px] font-medium px-2.5 py-1 rounded-full bg-bg border border-border text-muted">
+                          {new Date(idea.created_at).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}
+                        </span>
+                        {idea.source && <span className="text-[11px] text-muted/70">↗ {idea.source}</span>}
                       </div>
                     </div>
                   ))}

@@ -19,9 +19,15 @@ final class APIClient: ObservableObject {
         if let body = body {
             req.httpBody = body
         }
-        // Debug
-        // print("[API] \(method) \(url)")
-        let (data, response) = try await URLSession.shared.data(for: req)
+        print("[API] \(method) \(url) port=\(SidecarManager.shared.port) isRunning=\(SidecarManager.shared.isRunning)")
+        let (data, response): (Data, URLResponse)
+        do {
+            (data, response) = try await URLSession.shared.data(for: req)
+        } catch {
+            print("[API] network error for \(url): \(error) \(error.localizedDescription) \( (error as NSError).code )")
+            throw error
+        }
+        print("[API] response \(url) status \((response as? HTTPURLResponse)?.statusCode ?? -1) bytes \(data.count)")
         guard let http = response as? HTTPURLResponse else {
             throw URLError(.badServerResponse)
         }

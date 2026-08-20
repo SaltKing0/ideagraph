@@ -10,6 +10,7 @@ struct GraphView: View {
     @State private var search = ""
     @State private var selectedIdea: Idea?
     @State private var hoveredId: Int?
+    @StateObject private var sidecar = SidecarManager.shared
 
     private var allTags: [String] {
         let s = Set(ideas.flatMap { $0.tags })
@@ -20,13 +21,19 @@ struct GraphView: View {
         VStack(spacing: 0) {
             header.padding(16)
             Divider()
-            if loading {
+            if !sidecar.isReady && loading {
+                VStack(spacing: 8) {
+                    ProgressView("Backend startet… Port \(sidecar.port)").frame(maxWidth: .infinity, maxHeight: .infinity)
+                    Text(sidecar.baseURL.absoluteString).font(.system(size: 11)).foregroundStyle(.secondary)
+                }
+            } else if loading {
                 ProgressView("Lade Graph…").frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let error = error {
                 VStack(spacing: 8) {
                     Image(systemName: "exclamationmark.triangle").foregroundStyle(.red)
-                    Text(error).font(.system(size: 12)).foregroundStyle(.secondary)
-                    Button("Neu laden") { Task { await load() } }
+                    Text(error).font(.system(size: 12)).foregroundStyle(.secondary).multilineTextAlignment(.center).padding(.horizontal)
+                    Text("Sidecar \(sidecar.baseURL.absoluteString) – \(sidecar.isReady ? "läuft" : "wartet…")").font(.system(size: 11)).foregroundStyle(.secondary)
+                    Button("Neu laden") { Task { await load() } }.buttonStyle(.bordered).controlSize(.small)
                 }.frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let graph = graph {
                 GraphCanvas(graph: graph, ideas: ideas, filterTag: $filterTag, search: $search, selectedIdea: $selectedIdea, hoveredId: $hoveredId)
@@ -68,14 +75,23 @@ struct GraphView: View {
 
     private func load() async {
         loading = true
-        do {
-            async let g = APIClient.shared.getGraph()
-            async let is_ = APIClient.shared.listIdeas()
-            graph = try await g
-            ideas = try await is_
-            error = nil
-        } catch {
-            self.error = error.localizedDescription
+        for _ in 0..<20 {
+            if sidecar.isReady { break }
+            try? await Task.sleep(nanoseconds: 500_000_000)
+        }
+        for attempt in 0..<5 {
+            do {
+                async let g = APIClient.shared.getGraph()
+                async let is_ = APIClient.shared.listIdeas()
+                graph = try await g
+                ideas = try await is_
+                error = nil
+                loading = false
+                return
+            } catch {
+                if attempt == 4 { self.error = error.localizedDescription + " (Port \(sidecar.port))" }
+                try? await Task.sleep(nanoseconds: 700_000_000)
+            }
         }
         loading = false
     }

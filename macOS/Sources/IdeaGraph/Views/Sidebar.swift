@@ -68,9 +68,9 @@ struct SidebarView: View {
                     }
                     .padding(.vertical, 4)
                     HStack(spacing: 6) {
-                        Circle().fill(sidecar.isRunning ? Color.green : Color.red).frame(width: 8, height: 8)
-                            .shadow(color: sidecar.isRunning ? .green.opacity(0.6) : .clear, radius: 4)
-                        Text(sidecar.isRunning ? "Backend läuft" : "Backend stoppt").font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary)
+                        Circle().fill(sidecar.isReady ? Color.green : Color.red).frame(width: 8, height: 8)
+                            .shadow(color: sidecar.isReady ? .green.opacity(0.6) : .clear, radius: 4)
+                        Text(sidecar.isReady ? "Backend läuft" : "Backend stoppt").font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary)
                         Spacer()
                         Text(":\(sidecar.port)").font(.system(size: 11, design: .monospaced)).foregroundStyle(.secondary)
                     }

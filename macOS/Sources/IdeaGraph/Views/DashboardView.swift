@@ -4,15 +4,25 @@ struct DashboardView: View {
     @State private var stats: Stats?
     @State private var loading = true
     @State private var error: String?
+    @StateObject private var sidecar = SidecarManager.shared
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 header
-                if loading {
+                if !sidecar.isReady && loading {
+                    VStack(spacing: 8) {
+                        ProgressView("Backend startet… Port \(sidecar.port)").frame(maxWidth: .infinity, minHeight: 120)
+                        Text("Sidecar \(sidecar.baseURL.absoluteString) – \(sidecar.isReady ? "läuft" : "wartet…")").font(.system(size: 11)).foregroundStyle(.secondary)
+                    }
+                } else if loading {
                     ProgressView("Lade Dashboard…").frame(maxWidth: .infinity, minHeight: 200)
                 } else if let error = error {
-                    Text("Fehler: \(error)").foregroundStyle(.red).padding()
+                    VStack(spacing: 10) {
+                        Text("Fehler: \(error)").foregroundStyle(.red).font(.system(size: 12)).multilineTextAlignment(.center).padding()
+                        Text("Sidecar \(sidecar.baseURL.absoluteString) – \(sidecar.isReady ? "läuft" : "noch nicht bereit")").font(.system(size: 11)).foregroundStyle(.secondary)
+                        Button("Erneut versuchen") { Task { await load() } }.buttonStyle(.bordered).controlSize(.small)
+                    }.frame(maxWidth: .infinity)
                 } else if let stats = stats {
                     kpiGrid(stats: stats)
                     HStack(alignment: .top, spacing: 16) {
@@ -209,11 +219,24 @@ struct DashboardView: View {
 
     private func load() async {
         loading = true
-        do {
-            stats = try await APIClient.shared.getStats()
-            error = nil
-        } catch {
-            self.error = error.localizedDescription
+        // Wait for sidecar to be ready (max 10s)
+        for _ in 0..<20 {
+            if sidecar.isReady { break }
+            try? await Task.sleep(nanoseconds: 500_000_000)
+        }
+        // Retry with backoff
+        for attempt in 0..<5 {
+            do {
+                stats = try await APIClient.shared.getStats()
+                error = nil
+                loading = false
+                return
+            } catch {
+                if attempt == 4 {
+                    self.error = error.localizedDescription + " (Port \(sidecar.port))"
+                }
+                try? await Task.sleep(nanoseconds: 700_000_000)
+            }
         }
         loading = false
     }

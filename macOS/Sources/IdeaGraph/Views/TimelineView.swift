@@ -5,6 +5,7 @@ struct TimelineView: View {
     @State private var filter: TimelineFilter = .all
     @State private var loading = true
     @State private var error: String?
+    @StateObject private var sidecar = SidecarManager.shared
 
     enum TimelineFilter: String, CaseIterable, Identifiable {
         case all = "Alle"
@@ -42,10 +43,19 @@ struct TimelineView: View {
         VStack(spacing: 0) {
             header.padding(16)
             Divider()
-            if loading {
+            if !sidecar.isReady && loading {
+                VStack(spacing: 8) {
+                    ProgressView("Backend startet… Port \(sidecar.port)").frame(maxWidth: .infinity, maxHeight: .infinity)
+                    Text(sidecar.baseURL.absoluteString).font(.system(size: 11)).foregroundStyle(.secondary)
+                }
+            } else if loading {
                 ProgressView("Lade Timeline…").frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let error = error {
-                Text("Fehler: \(error)").foregroundStyle(.red).frame(maxWidth: .infinity, maxHeight: .infinity)
+                VStack(spacing: 8) {
+                    Text("Fehler: \(error)").foregroundStyle(.red).font(.system(size: 12)).multilineTextAlignment(.center).padding(.horizontal)
+                    Text("Sidecar \(sidecar.baseURL.absoluteString)").font(.system(size: 11)).foregroundStyle(.secondary)
+                    Button("Neu laden") { Task { await load() } }.buttonStyle(.bordered).controlSize(.small)
+                }.frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if grouped.isEmpty {
                 VStack(spacing: 12) {
                     Image(systemName: "clock.slash").font(.system(size: 28)).foregroundStyle(.secondary)
@@ -101,10 +111,21 @@ struct TimelineView: View {
 
     private func load() async {
         loading = true
-        do {
-            ideas = try await APIClient.shared.listIdeas()
-            error = nil
-        } catch { self.error = error.localizedDescription }
+        for _ in 0..<20 {
+            if sidecar.isReady { break }
+            try? await Task.sleep(nanoseconds: 500_000_000)
+        }
+        for attempt in 0..<5 {
+            do {
+                ideas = try await APIClient.shared.listIdeas()
+                error = nil
+                loading = false
+                return
+            } catch {
+                if attempt == 4 { self.error = error.localizedDescription + " (Port \(sidecar.port))" }
+                try? await Task.sleep(nanoseconds: 700_000_000)
+            }
+        }
         loading = false
     }
 }

@@ -22,6 +22,7 @@
 
 /* Begin PBXFileReference section */
 		18FFD1C8BBBDD88E7A4491EF /* IdeaGraphApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IdeaGraphApp.swift; sourceTree = "<group>"; };
+		26FD6888BFA94B6F77645255 /* IdeaGraph.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = IdeaGraph.entitlements; sourceTree = "<group>"; };
 		3B8FD797DC7AA112A8A629CC /* GraphView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GraphView.swift; sourceTree = "<group>"; };
 		4756D4A54E1AE69246398573 /* TimelineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineView.swift; sourceTree = "<group>"; };
 		4A5C2F52257F4557FE8E8D44 /* IdeaGraph.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = IdeaGraph.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -79,6 +80,7 @@
 			children = (
 				BE40F945D16503391743988D /* APIClient.swift */,
 				58042EE79A79C4C3DC33FB53 /* Assets.xcassets */,
+				26FD6888BFA94B6F77645255 /* IdeaGraph.entitlements */,
 				18FFD1C8BBBDD88E7A4491EF /* IdeaGraphApp.swift */,
 				D07194E17BBCEE5272F3ED28 /* Info.plist */,
 				9A437CBEBA7D5FFA2F27C5A2 /* Models.swift */,
@@ -200,8 +202,9 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_ALLOWED = YES;
 				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_ENTITLEMENTS = Sources/IdeaGraph/IdeaGraph.entitlements;
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
@@ -343,8 +346,9 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_ALLOWED = YES;
 				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_ENTITLEMENTS = Sources/IdeaGraph/IdeaGraph.entitlements;
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;

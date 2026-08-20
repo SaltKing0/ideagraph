@@ -7,6 +7,7 @@ final class SidecarManager: ObservableObject {
 
     @Published var port: Int = 8000
     @Published var isRunning: Bool = false
+    @Published var isReady: Bool = false
     @Published var errorMessage: String?
 
     private var process: Process?
@@ -148,6 +149,7 @@ final class SidecarManager: ObservableObject {
             try proc.run()
             self.process = proc
             self.isRunning = true
+            self.isReady = false
             print("[Sidecar] Started PID \(proc.processIdentifier)")
 
             // Wait a bit and health-check
@@ -159,6 +161,7 @@ final class SidecarManager: ObservableObject {
                 DispatchQueue.main.async {
                     print("[Sidecar] Terminated with status \(p.terminationStatus)")
                     self.isRunning = false
+                    self.isReady = false
                     self.process = nil
                 }
             }
@@ -177,6 +180,7 @@ final class SidecarManager: ObservableObject {
                 let (data, response) = try await URLSession.shared.data(from: url)
                 if let http = response as? HTTPURLResponse, http.statusCode == 200 {
                     print("[Sidecar] Health OK after \(Double(i)*0.5)s: \(String(data: data, encoding: .utf8) ?? "")")
+                    await MainActor.run { self.isReady = true }
                     return
                 }
             } catch {
@@ -185,6 +189,7 @@ final class SidecarManager: ObservableObject {
             print("[Sidecar] Waiting for health... \(i)")
         }
         print("[Sidecar] Health check timed out after 10s")
+        await MainActor.run { self.isReady = false }
     }
 
     func stop() {
@@ -198,6 +203,7 @@ final class SidecarManager: ObservableObject {
             }
         }
         isRunning = false
+        isReady = false
         process = nil
     }
 

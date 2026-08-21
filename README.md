@@ -18,11 +18,11 @@ A web app for tracking ideas with interactive graph visualization. Relationships
 - Force-directed layout (nodes = ideas, edges = connections)
 - Zoom, pan, drag & drop
 - Color coding by **first tag** (hash → HSL)
-- Type colors: `derived from` (purple), `similar to` (cyan), `contrasts with` (pink)
+- Type colors: `entstand aus` / "derived from" (purple), `ähnlich zu` / "similar to" (cyan), `kontrastiert mit` / "contrasts with" (pink)
 - Click a node → detail drawer with its connections
 
 ### 3. Connections
-- `POST /connections` — pick source → target + type: `derived from` / `similar to` / `contrasts with`
+- `POST /connections` — pick source → target + type: `entstand aus` / `ähnlich zu` / `kontrastiert mit`
 - Optional `label` (e.g. "builds on")
 - Validation: no self-connections, duplicate protection (409)
 - Delete; cascading delete when an idea is removed

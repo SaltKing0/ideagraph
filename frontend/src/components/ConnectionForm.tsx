@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Idea } from "../types";
 import { CONNECTION_TYPES } from "../types";
 import { api } from "../api";
@@ -19,6 +19,11 @@ export default function ConnectionForm({
   const [err, setErr] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  // keep the source pre-selection in sync when the selected idea changes
+  useEffect(() => {
+    if (preselectedSource != null) setSource(preselectedSource);
+  }, [preselectedSource]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();

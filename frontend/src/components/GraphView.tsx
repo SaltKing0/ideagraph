@@ -78,6 +78,16 @@ export default function GraphView() {
 
   const allTags = useMemo(() => Array.from(new Set(ideas.flatMap((i) => i.tags))).sort(), [ideas]);
 
+  // close the side sheet with Escape
+  useEffect(() => {
+    if (!selected) return;
+    const h = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSelected(null);
+    };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [selected]);
+
   // derived filter
   const filtered = useMemo(() => {
     if (!graph) return null;

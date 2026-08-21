@@ -61,6 +61,16 @@ export default function IdeaList({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusId, ideas]);
 
+  // close the detail modal with Escape
+  useEffect(() => {
+    if (!selected) return;
+    const h = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSelected(null);
+    };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [selected]);
+
   const showToast = (msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(null), 2400);
@@ -169,9 +179,9 @@ export default function IdeaList({
         {/* Left */}
         <div className="space-y-4 lg:sticky lg:top-6 self-start">
           {editing ? (
-            <IdeaForm initial={editing} onSubmit={updateIdea} onCancel={() => setEditing(null)} />
+            <IdeaForm key={`edit-${editing.id}`} initial={editing} onSubmit={updateIdea} onCancel={() => setEditing(null)} />
           ) : (
-            <IdeaForm onSubmit={createIdea} />
+            <IdeaForm key="new" onSubmit={createIdea} />
           )}
           <ConnectionForm ideas={ideas} onCreated={fetchAll} preselectedSource={selected?.id} />
           {related.length > 0 && selected && (

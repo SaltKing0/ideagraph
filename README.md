@@ -1,71 +1,72 @@
 # IdeaGraph
 
-Eine Web-App zum Tracken von Ideen mit interaktiver Graph-Visualisierung. Zusammenhänge zwischen Ideen werden als Netzwerk dargestellt – ähnlich Obsidian, aber spezialisiert auf **Ideen-Entwicklung und -Management**.
+A web app for tracking ideas with interactive graph visualization. Relationships between ideas are rendered as a network — similar to Obsidian, but specialized for **idea development and management**.
 
-> MVP nach `PROJEKT.md` – Backend + Frontend + Graph + Dashboard komplett.
+> MVP according to `PROJEKT.md` — backend + frontend + graph + dashboard, complete.
 
 ---
 
 ## ✨ Features
 
-### 1. Idee-Management
-- Idee erstellen (Titel*, Beschreibung, Quelle/Tags)
-- Bearbeiten / Löschen
-- Liste mit **Suche** (Titel/Beschreibung/Tags) und **Filter nach Tag**
-- Zeitstempel (`created_at`, `updated_at`) automatisch
+### 1. Idea Management
+- Create ideas (title*, description, source/tags)
+- Edit / delete
+- List with **search** (title/description/tags) and **filter by tag**
+- Timestamps (`created_at`, `updated_at`) added automatically
 
-### 2. Graph-Visualisierung (D3.js)
-- Force-directed Layout (Nodes = Ideen, Edges = Verbindungen)
-- Zoom, Pan, Drag & Drop
-- Farbcodierung nach **erstem Tag** (hash → HSL)
-- Typ-Farben: `entstand aus` (violett), `ähnlich zu` (cyan), `kontrastiert mit` (pink)
-- Klick auf Node → Detail-Drawer mit Verbindungen
+### 2. Graph Visualization (D3.js)
+- Force-directed layout (nodes = ideas, edges = connections)
+- Zoom, pan, drag & drop
+- Color coding by **first tag** (hash → HSL)
+- Type colors: `derived from` (purple), `similar to` (cyan), `contrasts with` (pink)
+- Click a node → detail drawer with its connections
 
-### 3. Verbindungen
-- `POST /connections` – Quelle → Ziel wählen + Typ: `entstand aus` / `ähnlich zu` / `kontrastiert mit`
-- Optional `label` (z. B. „baut darauf auf“)
-- Validierung: keine Selbst-Verbindung, Duplikats-Schutz (409)
-- Löschen; Kaskaden-Löschung bei Ideen-Delete
-- UI: Form im Ideen-Tab + Anzeige verwandter Verbindungen
+### 3. Connections
+- `POST /connections` — pick source → target + type: `derived from` / `similar to` / `contrasts with`
+- Optional `label` (e.g. "builds on")
+- Validation: no self-connections, duplicate protection (409)
+- Delete; cascading delete when an idea is removed
+- UI: form in the Ideas tab + display of related connections
 
-### 4. Zeitleiste
-- Alle Ideen nach Datum gruppiert (Tag → Ideen)
-- Filter: **Alle / Letzte Woche / Letzter Monat**
-- Vertikale Zeitachse, Uhrzeit + Quelle
+### 4. Timeline
+- All ideas grouped by date (day → ideas)
+- Filters: **All / Last week / Last month**
+- Vertical time axis, time + source
 
 ### 5. Dashboard
-- KPIs: Anzahl Ideen, Verbindungen, verschiedene Tags
-- **Tag-Cloud** (Größe ∝ Häufigkeit) + Top-5 Balken
-- **Heatmap** letzte 30 Tage (GitHub-Stil, 4 Stufen)
-- Mini-Bar: „Ideen pro Tag“
-- Neueste 5 Ideen
+- KPIs: number of ideas, connections, distinct tags
+- **Tag cloud** (size ∝ frequency) + top-5 bar chart
+- **Heatmap** of the last 30 days (GitHub-style, 4 levels)
+- Mini bar: "ideas per day"
+- 5 most recent ideas
 
 ### Design
-- Dunkles Theme (`#0f0f12`, `#18181b`, `#1f1f23`), violetter Akzent
-- Sidebar-Navigation (kollabierbar, responsive Drawer mobil)
-- Minimalistisch, Fokus auf Inhalt
+- Dark theme (`#0f0f12`, `#18181b`, `#1f1f23`), purple accent
+- Collapsible sidebar navigation (responsive drawer on mobile)
+- Minimalist, content-focused
 
 ---
 
-## 🧱 Tech-Stack
+## 🧱 Tech Stack
 
 | Layer | Tech |
 |-------|------|
 | Backend | FastAPI + SQLAlchemy + SQLite |
 | Frontend | React 19 + TypeScript + Vite + Tailwind CSS 3 + D3 v7 |
-| Architektur | REST, modulare Router, CORS offen, Proxy in Vite |
+| Architecture | REST, modular routers, open CORS, proxy in Vite |
+| macOS | Native SwiftUI app with a bundled Python backend sidecar |
 
-### API-Endpunkte
+### API Endpoints
 
 ```
-POST   /ideas                – erstellen
-GET    /ideas?q=&tag=        – liste (Suche+Filter)
-GET    /ideas/{id}           – einzeln
-PUT    /ideas/{id}           – aktualisieren
-DELETE /ideas/{id}           – löschen
-POST   /connections          – verbinden
-GET    /connections          – liste
-DELETE /connections/{id}     – trennen
+POST   /ideas                – create
+GET    /ideas?q=&tag=        – list (search + filter)
+GET    /ideas/{id}           – single
+PUT    /ideas/{id}           – update
+DELETE /ideas/{id}           – delete
+POST   /connections          – connect
+GET    /connections          – list
+DELETE /connections/{id}     – disconnect
 GET    /graph                – {nodes, edges}
 GET    /stats                – {total_ideas, total_connections, top_tags, ideas_per_day, heatmap, recent_ideas}
 GET    /health, GET /        – health/docs
@@ -73,63 +74,62 @@ GET    /health, GET /        – health/docs
 
 ---
 
-## 📦 Projektstruktur
+## 📦 Project Structure
 
 ```
 IdeaGraph/
 ├── backend/
 │   ├── app/
-│   │   ├── main.py           # FastAPI App, CORS, Router
+│   │   ├── main.py           # FastAPI app, CORS, router wiring
 │   │   ├── database.py       # SQLAlchemy engine (SQLite)
 │   │   ├── models.py         # Idea, Connection
-│   │   ├── schemas.py        # Pydantic, Tag-JSON, Typ-Validierung
+│   │   ├── schemas.py        # Pydantic, tag JSON, type validation
 │   │   └── routers/
 │   │       ├── ideas.py
 │   │       ├── connections.py
 │   │       ├── graph.py
 │   │       └── stats.py
-│   ├── main.py               # Shim für `uvicorn main:app --reload`
-│   ├── run_server.py         # NEU: Sidecar-Entrypoint (uvicorn 127.0.0.1:$PORT)
+│   ├── main.py               # Shim for `uvicorn main:app --reload`
+│   ├── run_server.py         # Sidecar entrypoint (uvicorn 127.0.0.1:$PORT)
 │   └── requirements.txt
-├── frontend/                 # bleibt für späteren Tauri/Win-Build erhalten
+├── frontend/                 # kept for a later Tauri/Win build
 │   ├── src/
-│   │   ├── api.ts            # fetch-Wrapper
-│   │   ├── types.ts          # TS-Typen + CONNECTION_TYPES
-│   │   ├── App.tsx           # Sidebar + View-Switch
+│   │   ├── api.ts            # fetch wrapper
+│   │   ├── types.ts          # TS types + CONNECTION_TYPES
+│   │   ├── App.tsx           # Sidebar + view switch
 │   │   ├── index.css         # Tailwind
 │   │   └── components/
 │   │       ├── Sidebar.tsx
 │   │       ├── Dashboard.tsx
 │   │       ├── IdeaList.tsx + IdeaForm.tsx
 │   │       ├── ConnectionForm.tsx
-│   │       ├── GraphView.swift   # D3 Force (Web) → SwiftUI Canvas (Mac)
+│   │       ├── GraphView.tsx   # D3 force layout
 │   │       └── Timeline.tsx
-│   ├── vite.config.ts        # Proxy /ideas → :8000
+│   ├── vite.config.ts        # proxy /ideas → :8000
 │   ├── tailwind.config.js
 │   └── package.json
-├── macOS/                    # NEU: native SwiftUI-App
-│   ├── IdeaGraph.xcodeproj   # via XcodeGen (project.yml)
+├── macOS/                      # native SwiftUI app
+│   ├── IdeaGraph.xcodeproj    # generated via XcodeGen (project.yml)
 │   ├── Sources/IdeaGraph/
-│   │   ├── IdeaGraphApp.swift      # @main, startet Sidecar
+│   │   ├── IdeaGraphApp.swift      # @main, launches sidecar
 │   │   ├── SidecarManager.swift    # Process, PORT, DATABASE_URL, AppSupport
 │   │   ├── APIClient.swift         # URLSession, http://127.0.0.1:$PORT
 │   │   ├── Models.swift            # Codable (Idea, Connection, Graph, Stats)
-│   │   ├── Views/
-│   │   │   ├── Sidebar.swift
-│   │   │   ├── DashboardView.swift
-│   │   │   ├── IdeaListView.swift + IdeaFormView.swift
-│   │   │   ├── ConnectionFormView.swift
-│   │   │   ├── GraphView.swift     # Canvas + Force-Simulation
-│   │   │   └── TimelineView.swift
-│   │   └── Assets.xcassets/AppIcon.appiconset
+│   │   ├── IdeaGraph.entitlements
+│   │   ├── Info.plist
+│   │   └── Views/
+│   │       ├── Sidebar.swift
+│   │       ├── DashboardView.swift
+│   │       ├── IdeaListView.swift + IdeaFormView.swift
+│   │       ├── GraphView.swift     # Canvas + force simulation
+│   │       └── TimelineView.swift
 │   ├── Resources/
-│   │   └── ideagraph-backend*      # kopiert aus sidecar/ via postBuildScript
-│   └── project.yml           # XcodeGen-Spec
-├── sidecar/                  # NEU: kompiliertes Backend-Binary (portabel)
+│   │   └── ideagraph-backend*      # copied from sidecar/ via post-build script
+│   └── project.yml                 # XcodeGen spec
+├── sidecar/                  # prebuilt backend binary (portable)
 │   ├── ideagraph-backend               # current (arm64 macOS)
-│   └── ideagraph-backend-aarch64-apple-darwin  # explizit für Mac
-├── IdeaGraph.app             # NEU: gebaute .app (Doppelklick, nach Build)
-├── requirements.txt          # Kopie für `pip install -r requirements.txt` im Root
+│   └── ideagraph-backend-aarch64-apple-darwin  # explicit Mac build
+├── requirements.txt          # copy for `pip install -r requirements.txt` at root
 ├── PROJEKT.md
 └── README.md
 ```
@@ -138,35 +138,35 @@ IdeaGraph/
 
 ## 🚀 Setup
 
-### Voraussetzungen
-- **Python 3.12** (3.14 hat aktuell keine pydantic-core wheels – 3.12 empfohlen). Homebrew: `brew install python@3.12`
-- **Node.js 20+** und npm 10+
+### Prerequisites
+- **Python 3.12** (3.14 currently lacks pydantic-core wheels — 3.12 recommended). Homebrew: `brew install python@3.12`
+- **Node.js 20+** and npm 10+
 - `pip3.12` / `python3.12`
 
-> Reasonable choices: Python 3.12 wegen moderner Wheels; SQLite-Datei liegt in `backend/ideagraph.db`; Tags als JSON-Text (einfach, portabel, kein Postgres-Array nötig); D3 statt vis.js (mehr Kontrolle, kein extra Wrapper).
+> Reasonable choices: Python 3.12 for modern wheels; the SQLite file lives at `backend/ideagraph.db`; tags are stored as JSON text (simple, portable, no Postgres array needed); D3 instead of vis.js (more control, no extra wrapper).
 
-### 1. Backend starten
+### 1. Start the backend
 
 ```bash
-# im Projekt-Root
+# from the project root
 pip install -r requirements.txt
-# oder nur backend:
+# or backend only:
 pip install -r backend/requirements.txt
 
-# via python 3.12 explizit (falls System-Python 3.14):
+# explicitly via Python 3.12 (if system Python is 3.14):
 python3.12 -m pip install --break-system-packages -r requirements.txt
 
-# Start
+# start
 cd backend
 uvicorn main:app --reload --port 8000
-# oder von überall mit Python 3.12:
+# or from anywhere with Python 3.12:
 python3.12 -m uvicorn backend.main:app --reload --port 8000 --app-dir .
 ```
 
-Backend läuft auf **http://localhost:8000**
+Backend runs at **http://localhost:8000**
 Docs: **http://localhost:8000/docs** (Swagger)
 
-### 2. Frontend starten
+### 2. Start the frontend
 
 ```bash
 cd frontend
@@ -174,9 +174,9 @@ npm install
 npm run dev
 ```
 
-Frontend: **http://localhost:5173** (Proxy leitet `/ideas`, `/connections`, `/graph`, `/stats` an Backend weiter – kein CORS-Problem)
+Frontend: **http://localhost:5173** (the proxy forwards `/ideas`, `/connections`, `/graph`, `/stats` to the backend — no CORS issues)
 
-### 3. Build (Produktion)
+### 3. Build (production)
 
 ```bash
 cd frontend
@@ -186,31 +186,31 @@ npm run preview # optional
 
 ---
 
-## 🍎 Native macOS App (SwiftUI + Sidecar) — Doppelklick ohne Terminal
+## 🍎 Native macOS App (SwiftUI + sidecar) — double-click, no terminal
 
-> Entscheidung: **SwiftUI nativ** (kein WebView). Backend als **einzelnes Binary** via PyInstaller (Python 3.12) als Sidecar in die `.app` eingebettet. Portabel: später Windows/Linux via Tauri/React ohne Backend-Rewrite.
+> Decision: **native SwiftUI** (no WebView). The backend is bundled as a **single binary** via PyInstaller (Python 3.12) as a sidecar inside the `.app`. Portable: later Windows/Linux builds via Tauri/React can reuse the same backend without a rewrite.
 
-### Architektur
-- `macOS/Sources/IdeaGraph/IdeaGraphApp.swift` — `@main`, startet `SidecarManager` beim `task`, stoppt beim `terminate`.
-- `SidecarManager.swift` — findet `ideagraph-backend` im Bundle (`Bundle.main.url(forResource:)`), wählt freien Port ab 8000, setzt `DATABASE_URL=sqlite:////Users/.../Library/Caches/IdeaGraph/ideagraph.db` (Caches statt `Application Support` wegen PyInstaller-Leerzeichen-Bug, siehe unten), startet `Process`, loggt stdout/stderr, health-check `http://127.0.0.1:$PORT/health`, beendet beim App-Exit.
-- `APIClient.swift` — `base = http://127.0.0.1:\(port)`, async/await für alle Endpunkte (`listIdeas`, `createIdea`, … `getGraph`, `getStats`).
-- SwiftUI Views 1:1 zu React: `Sidebar` (NavigationSplitView), `DashboardView`, `IdeaListView` + `IdeaFormView`, `ConnectionFormView`, `GraphView` (Canvas + Force-Simulation mit Timer, Drag & Drop, Zoom/Pan, Tag-Punkt, Typ-Farben), `TimelineView`. Dunkles Theme `#09090b`/`#18181b`/`#27272a`, Indigo `#6366f1`.
+### Architecture
+- `macOS/Sources/IdeaGraph/IdeaGraphApp.swift` — `@main`, starts `SidecarManager` on launch, stops it on terminate.
+- `SidecarManager.swift` — locates `ideagraph-backend` in the bundle (`Bundle.main.url(forResource:)`), picks a free port starting at 8000, sets `DATABASE_URL=sqlite:////Users/.../Library/Caches/IdeaGraph/ideagraph.db` (Caches instead of `Application Support` due to a PyInstaller whitespace bug, see below), launches the `Process`, logs stdout/stderr, health-checks `http://127.0.0.1:$PORT/health`, and terminates it on app exit.
+- `APIClient.swift` — `base = http://127.0.0.1:\(port)`, async/await for all endpoints (`listIdeas`, `createIdea`, … `getGraph`, `getStats`).
+- SwiftUI views mirror the React ones 1:1: `Sidebar` (NavigationSplitView), `DashboardView`, `IdeaListView` + `IdeaFormView`, `GraphView` (Canvas + force simulation with a timer, drag & drop, zoom/pan, tag dot, type colors), `TimelineView`. Dark theme `#09090b`/`#18181b`/`#27272a`, indigo `#6366f1`.
 
-### Datenpersistenz
-- Beim Start wird `~/Library/Caches/IdeaGraph/` (und `~/Library/Application Support/IdeaGraph/` für Kompatibilität) angelegt.
-- Sidecar bekommt `DATABASE_URL` als env; DB liegt in `Caches/IdeaGraph/ideagraph.db` (statt `Application Support` mit Leerzeichen, da PyInstaller-`onefile` mit Leerzeichen im SQLite-Pfad hängt — Python direkt funktioniert, Binary nicht; daher Caches ohne Leerzeichen; DB persistiert zwischen Neustarts).
-- `frontend/` bleibt erhalten für späteren Tauri-Build.
+### Data persistence
+- On launch, `~/Library/Caches/IdeaGraph/` (and `~/Library/Application Support/IdeaGraph/` for compatibility) is created.
+- The sidecar receives `DATABASE_URL` as an env var; the DB lives at `Caches/IdeaGraph/ideagraph.db` (not `Application Support`, which contains spaces — PyInstaller's `onefile` build chokes on spaces in the SQLite path; plain Python is fine, the binary is not — hence the space-free Caches path; the DB persists across restarts).
+- `frontend/` is kept as a web fallback for a later Tauri build.
 
-### Voraussetzungen (macOS)
-- Xcode 15+ (getestet 26.6, Swift 6.3, macOS 14 SDK), `xcodegen` (`brew install xcodegen`)
+### Prerequisites (macOS)
+- Xcode 15+ (tested 26.6, Swift 6.3, macOS 14 SDK), `xcodegen` (`brew install xcodegen`)
 - Python 3.12 (`brew install python@3.12`), `pyinstaller` (`python3.12 -m pip install pyinstaller`)
 
-### Backend als Sidecar bauen
+### Build the backend sidecar
 ```bash
-# 1. Sidecar-Entrypoint bereits vorhanden: backend/run_server.py
+# 1. Sidecar entrypoint already exists: backend/run_server.py
 cat backend/run_server.py  # uvicorn.run(app, host="127.0.0.1", port=int(os.getenv("PORT",8000)))
 
-# 2. Binary bauen (Python 3.12, NICHT 3.14)
+# 2. Build the binary (Python 3.12, NOT 3.14)
 python3.12 -m pip install --break-system-packages -r backend/requirements.txt pyinstaller
 python3.12 -m PyInstaller --name ideagraph-backend --onefile backend/run_server.py \
   --distpath sidecar --workpath /tmp/pyinstaller_build --specpath /tmp --clean --noconfirm \
@@ -219,46 +219,46 @@ cp sidecar/ideagraph-backend sidecar/ideagraph-backend-aarch64-apple-darwin
 cp sidecar/ideagraph-backend macOS/Resources/
 ```
 
-### macOS App bauen
+### Build the macOS app
 ```bash
-# XcodeGen → .xcodeproj erzeugen
+# XcodeGen → generate the .xcodeproj
 xcodegen generate --spec macOS/project.yml --project macOS
 
-# Build (Debug, ad-hoc signiert, kein Hardened Runtime)
+# Build (Debug, ad-hoc signed, no hardened runtime)
 xcodebuild -project macOS/IdeaGraph.xcodeproj -scheme IdeaGraph -configuration Debug build
 
-# .app liegt dann in DerivedData, z. B.:
+# The .app lands in DerivedData, e.g.:
 find ~/Library/Developer/Xcode/DerivedData -name "IdeaGraph.app" -type d | head
-# Für Doppelklick bequem kopieren:
+# Copy it out for convenient double-click launching:
 cp -R ~/Library/Developer/Xcode/DerivedData/IdeaGraph-*/Build/Products/Debug/IdeaGraph.app ./IdeaGraph.app
-# oder aus macOS/ heraus:
+# or from macOS/:
 xcodebuild -project macOS/IdeaGraph.xcodeproj -scheme IdeaGraph -configuration Release build  # optional
 ```
 
-### Starten & Testen
+### Launch & test
 ```bash
-# Doppelklick im Finder:
+# Double-click in Finder:
 open IdeaGraph.app
-# oder im Terminal zum Log-Sehen:
+# or run in Terminal to see logs:
 ./IdeaGraph.app/Contents/MacOS/IdeaGraph
-# Sidecar läuft auf http://127.0.0.1:8000 (falls belegt, nimmt SidecarManager 8001+)
+# Sidecar runs on http://127.0.0.1:8000 (or 8001+ if taken)
 curl http://127.0.0.1:8000/health  # → {"status":"ok"}
-# In der App: Idee anlegen → Dashboard zählt, 2. Idee + Verbindung → Graph zeigt Edge, Timeline „Letzte Woche“, Graph Drag/Zoom/Click→Sheet, DB wächst in ~/Library/Caches/IdeaGraph/ideagraph.db
+# In the app: create an idea → dashboard counts it; 2nd idea + connection → graph shows an edge;
+# Timeline "Last week"; graph drag/zoom/click → sheet; DB grows at ~/Library/Caches/IdeaGraph/ideagraph.db
 ```
-- **Ohne Signing:** Beim ersten Start Rechtsklick → Öffnen → Öffnen (Gatekeeper).
-- **Beenden:** Fenster schließen → Sidecar wird via `process.terminate()` sauber beendet.
+- **Unsigned:** on first launch, right-click → Open → Open (Gatekeeper).
+- **Quit:** closing the window terminates the sidecar cleanly via `process.terminate()`.
 
-### Warum so?
-- Swift lernen, nur macOS privat nutzen → SwiftUI nativ sinnvoll.
-- Backend als Binary portabel → später Tauri (React) für Win/Linux kann dasselbe `sidecar/ideagraph-backend-*` nutzen, kein Rewrite.
-- `frontend/` bleibt als Web-Fallback.
+### Why this approach?
+- Learning Swift, macOS-only for personal use → native SwiftUI makes sense.
+- Backend as a portable binary → a later Tauri (React) build for Win/Linux can reuse the same `sidecar/ideagraph-backend-*` with no rewrite.
+- `frontend/` stays as a web fallback.
 
 ---
 
-## 🧪 Test (kurz)
+## 🧪 Tests (brief)
 
-### Backend-Smoke (ohne Server)
-
+### Backend smoke test (no server)
 ```bash
 python3.12 << 'PY'
 import sys; sys.path.insert(0, "backend")
@@ -270,43 +270,43 @@ print(c.get("/stats").json().keys())
 PY
 ```
 
-### Manuell
-1. Backend + Frontend starten (s. oben)
-2. Im Frontend: Idee erstellen → in Liste + Dashboard zählen
-3. Zweite Idee → Verbindung erstellen (Graph zeigt Edge)
-4. Graph: Drag, Zoom, Click → Details
-5. Timeline: „Letzte Woche“ zeigt frische Ideen
-6. Dashboard: Tag-Cloud, Heatmap prüfen
+### Manual
+1. Start backend + frontend (see above)
+2. In the frontend: create an idea → appears in the list and dashboard count
+3. Second idea → create a connection (graph shows an edge)
+4. Graph: drag, zoom, click → details
+5. Timeline: "Last week" shows fresh ideas
+6. Dashboard: check tag cloud and heatmap
 
 ---
 
-## ⚙️ Konfiguration
+## ⚙️ Configuration
 
-- `DATABASE_URL` env überschreibt SQLite-Pfad (Default `sqlite:///./ideagraph.db` → `backend/ideagraph.db`)
-- CORS: `allow_origins=["*"]` für MVP (für Prod einschränken)
-- Frontend-Proxy in `frontend/vite.config.ts`
-
----
-
-## 📝 Notizen / Entscheidungen
-
-- **Tags** werden als JSON-String gespeichert – kein separates Tag-Modell → MVP-einfach, Filter in Python (statt SQLite JSON1)
-- **Connection-Label** optional ergänzt (PROJEKT: „Verbesonderung anzeigen“) – UI zeigt Typ + Label
-- **Graph-Filter** nach Tag: blendet nur passende Nodes/Edges ein (statt Ausgrauen) → klarer bei vielen Nodes
-- **Heatmap** = letzte 30 Tage (statt 365) → passt zu MVP & `stats`-Response (`ideas_per_day` + `heatmap` identisch, 30 Einträge)
-- **Python-Version**: README verlangt `pip`/`uvicorn` – Root-`requirements.txt` + `backend/main.py` Shim stützen beides
+- `DATABASE_URL` env overrides the SQLite path (default `sqlite:///./ideagraph.db` → `backend/ideagraph.db`)
+- CORS: `allow_origins=["*"]` for the MVP (restrict for production)
+- Frontend proxy in `frontend/vite.config.ts`
 
 ---
 
-## 🗺️ Weiter denkbar
+## 📝 Notes / Decisions
 
-- Auth (pro User eigene Ideen)
-- Volltext-Suche (FTS5)
-- Graph: vis.js oder Canvas für >500 Nodes
+- **Tags** are stored as a JSON string — no separate tag model → MVP-simple, filtering in Python (instead of SQLite JSON1)
+- **Connection label** added optionally (PROJEKT: "show the nuance") — UI shows type + label
+- **Graph filter** by tag: hides non-matching nodes/edges (instead of greying out) → clearer with many nodes
+- **Heatmap** = last 30 days (instead of 365) → fits the MVP & `stats` response (`ideas_per_day` + `heatmap` are identical, 30 entries)
+- **Python version**: README expects `pip`/`uvicorn` — the root `requirements.txt` + `backend/main.py` shim support both
+
+---
+
+## 🗺️ Possible Future Work
+
+- Auth (per-user ideas)
+- Full-text search (FTS5)
+- Graph: vis.js or Canvas for >500 nodes
 - Export (Markdown/JSON)
 
 ---
 
-## Lizenz
+## License
 
-MVP-Beispielprojekt – frei nutzbar.
+MVP sample project — free to use.

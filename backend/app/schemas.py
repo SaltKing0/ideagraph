@@ -1,9 +1,14 @@
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, Field
 from typing import Optional, List
 from datetime import datetime
 import json
 
 ALLOWED_CONNECTION_TYPES = ["entstand aus", "ähnlich zu", "kontrastiert mit"]
+
+MAX_TITLE_LEN = 200
+MAX_SOURCE_LEN = 300
+MAX_DESCRIPTION_LEN = 5000
+MAX_LABEL_LEN = 200
 
 
 def _parse_tags(tags_str: Optional[str]) -> List[str]:
@@ -28,9 +33,9 @@ def _encode_tags(tags: Optional[List[str]]) -> Optional[str]:
 
 
 class IdeaBase(BaseModel):
-    title: str
-    description: Optional[str] = None
-    source: Optional[str] = None
+    title: str = Field(..., max_length=MAX_TITLE_LEN)
+    description: Optional[str] = Field(default=None, max_length=MAX_DESCRIPTION_LEN)
+    source: Optional[str] = Field(default=None, max_length=MAX_SOURCE_LEN)
     tags: List[str] = []
 
 
@@ -39,9 +44,9 @@ class IdeaCreate(IdeaBase):
 
 
 class IdeaUpdate(BaseModel):
-    title: Optional[str] = None
-    description: Optional[str] = None
-    source: Optional[str] = None
+    title: Optional[str] = Field(default=None, max_length=MAX_TITLE_LEN)
+    description: Optional[str] = Field(default=None, max_length=MAX_DESCRIPTION_LEN)
+    source: Optional[str] = Field(default=None, max_length=MAX_SOURCE_LEN)
     tags: Optional[List[str]] = None
 
 
@@ -67,7 +72,7 @@ class ConnectionBase(BaseModel):
     source_id: int
     target_id: int
     type: str
-    label: Optional[str] = None
+    label: Optional[str] = Field(default=None, max_length=MAX_LABEL_LEN)
 
     @field_validator("type")
     @classmethod

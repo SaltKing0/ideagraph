@@ -12,11 +12,13 @@ export default function Sidebar({
   setView,
   collapsed,
   setCollapsed,
+  onOpenCommand,
 }: {
   view: View;
   setView: (v: View) => void;
   collapsed: boolean;
   setCollapsed: (b: boolean) => void;
+  onOpenCommand?: () => void;
 }) {
   return (
     <aside
@@ -44,14 +46,17 @@ export default function Sidebar({
         </button>
       </div>
 
-      {/* Search placeholder – Linear style */}
+      {/* Search – opens the ⌘K command palette */}
       {!collapsed && (
         <div className="p-3">
-          <div className="flex items-center gap-2 h-8 px-2.5 rounded-lg bg-surface border border-border text-[13px] text-muted">
+          <button
+            onClick={() => onOpenCommand?.()}
+            className="w-full flex items-center gap-2 h-8 px-2.5 rounded-lg bg-surface border border-border text-[13px] text-muted hover:text-heading hover:border-white/10 transition cursor-pointer"
+          >
             <span className="opacity-60">⌕</span>
-            <span className="flex-1">Suchen…</span>
+            <span className="flex-1 text-left">Suchen…</span>
             <span className="text-[10px] bg-white/[0.06] border border-white/[0.06] px-1.5 py-0.5 rounded">⌘ K</span>
-          </div>
+          </button>
         </div>
       )}
 

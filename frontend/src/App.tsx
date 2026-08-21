@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Sidebar from "./components/Sidebar";
 import Dashboard from "./components/Dashboard";
 import IdeaList from "./components/IdeaList";
 import GraphView from "./components/GraphView";
 import Timeline from "./components/Timeline";
+import CommandPalette from "./components/CommandPalette";
 
 type View = "dashboard" | "ideas" | "graph" | "timeline";
 
@@ -11,12 +12,31 @@ export default function App() {
   const [view, setView] = useState<View>("dashboard");
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [commandOpen, setCommandOpen] = useState(false);
+  const [focusIdea, setFocusIdea] = useState<number | null>(null);
+
+  // global ⌘K / Ctrl+K shortcut
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setCommandOpen((v) => !v);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
+  const jumpToIdea = (id: number) => {
+    setFocusIdea(id);
+    setView("ideas");
+  };
 
   return (
     <div className="min-h-screen bg-bg flex selection:bg-accent/30">
       {/* Desktop Sidebar */}
       <div className="hidden md:flex">
-        <Sidebar view={view} setView={setView} collapsed={collapsed} setCollapsed={setCollapsed} />
+        <Sidebar view={view} setView={setView} collapsed={collapsed} setCollapsed={setCollapsed} onOpenCommand={() => setCommandOpen(true)} />
       </div>
 
       {/* Mobile drawer */}
@@ -31,6 +51,10 @@ export default function App() {
               }}
               collapsed={false}
               setCollapsed={() => {}}
+              onOpenCommand={() => {
+                setMobileOpen(false);
+                setCommandOpen(true);
+              }}
             />
           </div>
           <div className="flex-1 bg-black/60 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
@@ -61,7 +85,7 @@ export default function App() {
                 }}
               />
             )}
-            {view === "ideas" && <IdeaList />}
+            {view === "ideas" && <IdeaList focusId={focusIdea} onFocusHandled={() => setFocusIdea(null)} />}
             {view === "graph" && <GraphView />}
             {view === "timeline" && <Timeline />}
           </div>
@@ -78,6 +102,13 @@ export default function App() {
           </span>
         </footer>
       </div>
+
+      <CommandPalette
+        open={commandOpen}
+        onClose={() => setCommandOpen(false)}
+        onJumpToIdea={jumpToIdea}
+        onCommand={setView}
+      />
     </div>
   );
 }

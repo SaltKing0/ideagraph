@@ -14,7 +14,13 @@ function SkeletonCard() {
   );
 }
 
-export default function IdeaList() {
+export default function IdeaList({
+  focusId,
+  onFocusHandled,
+}: {
+  focusId?: number | null;
+  onFocusHandled?: () => void;
+}) {
   const [ideas, setIdeas] = useState<Idea[]>([]);
   const [connections, setConnections] = useState<any[]>([]);
   const [q, setQ] = useState("");
@@ -42,6 +48,18 @@ export default function IdeaList() {
   useEffect(() => {
     fetchAll();
   }, []);
+
+  // jump-to-idea from the global ⌘K command palette: open its detail sheet
+  useEffect(() => {
+    if (focusId != null) {
+      const idea = ideas.find((i) => i.id === focusId);
+      if (idea) {
+        setSelected(idea);
+        onFocusHandled?.();
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusId, ideas]);
 
   const showToast = (msg: string) => {
     setToast(msg);

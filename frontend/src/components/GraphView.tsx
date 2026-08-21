@@ -6,11 +6,44 @@ import type { Graph, Idea } from "../types";
 type D3Node = Graph["nodes"][0] & { x?: number; y?: number; fx?: number | null; fy?: number | null };
 type D3Link = { id: number; source: D3Node | number; target: D3Node | number; type: string; label?: string | null };
 
+// --- module-scope helpers (stable references, so they never re-trigger the graph effects) ---
+const tagDot = (tag: string) => {
+  let h = 0;
+  for (let i = 0; i < tag.length; i++) h = (h * 31 + tag.charCodeAt(i)) >>> 0;
+  const hue = h % 360;
+  return `hsl(${hue} 65% 58%)`;
+};
+
+const typeMeta: Record<string, { color: string; dash: string | null; label: string }> = {
+  "entstand aus": { color: "#6366f1", dash: null, label: "—" },
+  "ähnlich zu": { color: "#a1a1aa", dash: "4 4", label: "╌" },
+  "kontrastiert mit": { color: "#f43f5e", dash: "2 6", label: "┈" },
+};
+
+// neighbors of a focused node (or empty when nothing is focused)
+function computeNeighbors(hov: number | null, sel: Idea | null, links: D3Link[]) {
+  const s = new Set<number>();
+  const id = sel?.id ?? hov;
+  if (id == null) return s;
+  links.forEach((l) => {
+    const si = l.source as number;
+    const ti = l.target as number;
+    if (si === id) s.add(ti);
+    if (ti === id) s.add(si);
+  });
+  return s;
+}
+
 export default function GraphView() {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
   const svgSelRef = useRef<d3.Selection<SVGSVGElement, unknown, null, undefined> | null>(null);
+  // D3 selections kept in refs so the highlight effect can restyle without rebuilding the graph
+  const nodeSelRef = useRef<any | null>(null);
+  const linkSelRef = useRef<any | null>(null);
+  const linkLabelSelRef = useRef<any | null>(null);
+  const ideasRef = useRef<Idea[]>([]);
 
   const [graph, setGraph] = useState<Graph | null>(null);
   const [ideas, setIdeas] = useState<Idea[]>([]);
@@ -20,6 +53,10 @@ export default function GraphView() {
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    ideasRef.current = ideas;
+  }, [ideas]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -40,19 +77,6 @@ export default function GraphView() {
   }, []);
 
   const allTags = useMemo(() => Array.from(new Set(ideas.flatMap((i) => i.tags))).sort(), [ideas]);
-
-  const tagDot = (tag: string) => {
-    let h = 0;
-    for (let i = 0; i < tag.length; i++) h = (h * 31 + tag.charCodeAt(i)) >>> 0;
-    const hue = h % 360;
-    return `hsl(${hue} 65% 58%)`;
-  };
-
-  const typeMeta: Record<string, { color: string; dash: string | null; label: string }> = {
-    "entstand aus": { color: "#6366f1", dash: null, label: "—" },
-    "ähnlich zu": { color: "#a1a1aa", dash: "4 4", label: "╌" },
-    "kontrastiert mit": { color: "#f43f5e", dash: "2 6", label: "┈" },
-  };
 
   // derived filter
   const filtered = useMemo(() => {
@@ -75,7 +99,8 @@ export default function GraphView() {
     return { nodes, links };
   }, [graph, filterTag, q]);
 
-  // D3 render
+  // Build the graph once per data change. Hovering/selecting does NOT rebuild it:
+  // the highlight effect below just restyles the existing elements.
   useEffect(() => {
     if (!filtered || !svgRef.current || !containerRef.current) return;
 
@@ -90,6 +115,9 @@ export default function GraphView() {
     const { nodes, links } = filtered;
 
     if (nodes.length === 0) {
+      nodeSelRef.current = null;
+      linkSelRef.current = null;
+      linkLabelSelRef.current = null;
       svg
         .append("text")
         .attr("x", width / 2)
@@ -123,8 +151,6 @@ export default function GraphView() {
       .on("zoom", (event) => g.attr("transform", event.transform));
     zoomRef.current = zoom;
     svg.call(zoom as any).on("dblclick.zoom", null);
-
-    // center initial view with small padding
     svg.call(zoom.transform as any, d3.zoomIdentity);
 
     const simNodes = nodes as any[];
@@ -180,9 +206,6 @@ export default function GraphView() {
       .attr("fill", (d: any) => typeMeta[d.type]?.color || "#a1a1aa")
       .text((d: any) => d.type);
 
-    const focusedId = selected?.id ?? hovered ?? null;
-    const neighborIds = useMemoSet(hovered, selected, links);
-
     // nodes – Linear minimal
     const node = g
       .append("g")
@@ -209,25 +232,25 @@ export default function GraphView() {
           }) as any
       );
 
-    // outer ring for selected/hovered – premium subtle
+    // outer ring for selected/hovered – premium subtle (opacity driven by highlight effect)
     node
       .append("circle")
+      .attr("class", "focus-ring")
       .attr("r", 28)
       .attr("fill", "none")
       .attr("stroke", "#6366f1")
       .attr("stroke-width", 1.2)
-      .attr("opacity", (d: any) => (d.id === focusedId ? 0.9 : 0))
-      .attr("class", "focus-ring");
+      .attr("opacity", 0);
 
-    // main node – surface
+    // main node – surface (stroke/filter driven by highlight effect)
     node
       .append("circle")
+      .attr("class", "node-core")
       .attr("r", 20)
       .attr("fill", "#18181b")
-      .attr("stroke", (d: any) => (d.id === focusedId ? "#6366f1" : "#27272a"))
-      .attr("stroke-width", (d: any) => (d.id === focusedId ? 1.4 : 1))
-      .style("transition", "all 200ms ease")
-      .style("filter", (d: any) => (d.id === focusedId ? "drop-shadow(0 0 12px rgba(99,102,241,0.35))" : "none"));
+      .attr("stroke", "#27272a")
+      .attr("stroke-width", 1)
+      .style("transition", "all 200ms ease");
 
     // tag dot – small bottom-right
     node
@@ -284,27 +307,16 @@ export default function GraphView() {
       text.attr("x", 0);
     });
 
-    // dim non-focused when focused
-    const isDim = (d: any) => focusedId !== null && d.id !== focusedId && !neighborIds.has(d.id);
-    node.style("opacity", (d: any) => (isDim(d) ? 0.22 : 1));
-    link.style("opacity", (d: any) => {
-      if (focusedId === null) return 0.35;
-      const s = (d.source as any).id ?? d.source;
-      const t = (d.target as any).id ?? d.target;
-      return s === focusedId || t === focusedId ? 0.9 : 0.08;
-    });
-    linkLabel.style("opacity", (d: any) => {
-      if (focusedId === null) return 0.9;
-      const s = (d.source as any).id ?? d.source;
-      const t = (d.target as any).id ?? d.target;
-      return s === focusedId || t === focusedId ? 1 : 0.12;
-    });
+    // keep refs so the highlight effect can restyle without rebuilding
+    nodeSelRef.current = node;
+    linkSelRef.current = link;
+    linkLabelSelRef.current = linkLabel;
 
     node
       .on("mouseenter", (_e, d: any) => setHovered(d.id))
       .on("mouseleave", () => setHovered(null))
       .on("click", (_e, d: any) => {
-        const idea = ideas.find((i) => i.id === d.id) || null;
+        const idea = ideasRef.current.find((i) => i.id === d.id) || null;
         setSelected(idea);
       });
 
@@ -320,22 +332,45 @@ export default function GraphView() {
 
     return () => {
       simulation.stop();
+      nodeSelRef.current = null;
+      linkSelRef.current = null;
+      linkLabelSelRef.current = null;
     };
-  }, [filtered, ideas, hovered, selected]);
+  }, [filtered, q, filterTag]);
 
-  // helper for neighbor set
-  function useMemoSet(hov: number | null, sel: Idea | null, links: D3Link[]) {
-    const s = new Set<number>();
-    const id = sel?.id ?? hov;
-    if (id == null) return s;
-    links.forEach((l) => {
-      const si = l.source as number;
-      const ti = l.target as number;
-      if (si === id) s.add(ti);
-      if (ti === id) s.add(si);
+  // Ego-highlight on hover/selection: restyles existing elements, never rebuilds.
+  useEffect(() => {
+    if (!filtered || !nodeSelRef.current || !linkSelRef.current || !linkLabelSelRef.current) return;
+    const focusedId = selected?.id ?? hovered ?? null;
+    const neighborIds = computeNeighbors(hovered, selected, filtered.links);
+
+    nodeSelRef.current
+      .select(".focus-ring")
+      .attr("opacity", (d: any) => (d.id === focusedId ? 0.9 : 0));
+    nodeSelRef.current
+      .select(".node-core")
+      .attr("stroke", (d: any) => (d.id === focusedId ? "#6366f1" : "#27272a"))
+      .attr("stroke-width", (d: any) => (d.id === focusedId ? 1.4 : 1))
+      .style("filter", (d: any) =>
+        d.id === focusedId ? "drop-shadow(0 0 12px rgba(99,102,241,0.35))" : "none"
+      );
+    nodeSelRef.current.style("opacity", (d: any) => {
+      const dim = focusedId !== null && d.id !== focusedId && !neighborIds.has(d.id);
+      return dim ? 0.22 : 1;
     });
-    return s;
-  }
+    linkSelRef.current.style("opacity", (d: any) => {
+      if (focusedId === null) return 0.35;
+      const s = (d.source as any).id ?? d.source;
+      const t = (d.target as any).id ?? d.target;
+      return s === focusedId || t === focusedId ? 0.9 : 0.08;
+    });
+    linkLabelSelRef.current.style("opacity", (d: any) => {
+      if (focusedId === null) return 0.9;
+      const s = (d.source as any).id ?? d.source;
+      const t = (d.target as any).id ?? d.target;
+      return s === focusedId || t === focusedId ? 1 : 0.12;
+    });
+  }, [filtered, ideas, hovered, selected]);
 
   const handleZoom = (dir: "in" | "out" | "reset") => {
     const svg = svgSelRef.current;

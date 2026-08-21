@@ -56,8 +56,6 @@ final class SidecarManager: ObservableObject {
             URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent("macOS/Resources/ideagraph-backend"),
             URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent("sidecar/ideagraph-backend"),
             URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent("sidecar/ideagraph-backend-aarch64-apple-darwin"),
-            URL(fileURLWithPath: "/Users/niklas/Salt/IdeaGraph/macOS/Resources/ideagraph-backend"),
-            URL(fileURLWithPath: "/Users/niklas/Salt/IdeaGraph/sidecar/ideagraph-backend"),
         ]
         for c in candidates where fm.fileExists(atPath: c.path) {
             return c
